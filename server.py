@@ -16,9 +16,7 @@ signal.signal(signal.SIGINT, signal_handler)
 mcp = FastMCP(
     name="CB-assistant",
     host="127.0.0.1",
-    port=5001,
-    # Add this to make the server more resilient
-    timeout=15  # Increase timeout to 15 seconds
+    port=5001
 )
 
 # This tool gets the Context Broker version
