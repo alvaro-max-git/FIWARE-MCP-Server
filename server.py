@@ -4,6 +4,17 @@ import signal
 import sys
 import requests
 import json
+import logging
+
+# --- Logging to STDERR only ---
+logger = logging.getLogger("cb-assistant")
+logger.setLevel(logging.INFO)
+logger.handlers.clear()
+_stderr_handler = logging.StreamHandler(sys.stderr)
+_stderr_handler.setLevel(logging.INFO)
+logger.addHandler(_stderr_handler)
+logger.propagate = False
+
 
 # Handle SIGINT (Ctrl+C) gracefully
 def signal_handler(sig, frame):
@@ -65,19 +76,6 @@ def get_all_entities(address: str="localhost", port: int=1026,  limit=1000, extr
         return json.dumps({"error": str(e)})
 
 
-# This tool queries entities in the Context Broker
-# - You can add a query to the request if needed
-@mcp.tool()
-def query_CB(address: str="localhost", port: int=1026, query: str="") -> str:
-    """Query the CB."""
-    try:
-        url = f"http://{address}:{port}/query"
-        response = requests.get(url, params={"query": query})
-        response.raise_for_status()  # Raise an exception for bad status codes
-        return json.dumps(response.json())
-    except requests.exceptions.RequestException as e:
-        return json.dumps({"error": str(e)})
-
 
 # This tool gets all entity types from the Context Broker
 # - You can add extra headers to the request if needed
@@ -105,6 +103,63 @@ def get_entity_types(address: str="localhost", port: int=1026, limit=1000, extra
         return json.dumps(response.json())
     except requests.exceptions.RequestException as e:
         return json.dumps({"error": str(e)})
+
+
+# This tool allows to execute any query to the Context Broker
+# - You should provide the full or partial URL of the query
+# - For example, to get the entity of type "Building" whose name is "Building 1" you should provide the following URL:
+# 'GET http://localhost:1026/ngsi-ld/v1/entities/Building/name/Building%201' or 'GET /ngsi-ld/v1/entities/Building/name/Building%201'
+# you need to provide the proper parameter for the GET request
+@mcp.tool()
+def execute_query(params: str) -> str:
+        """
+        This tools just passes the query to the Context Broker and returns the response
+        You should provide the full or partial VALID query to the Context Broker
+        you need to provide the proper parameter for the GET request.
+        For example, to get the entity of type "Building" whose name is "Building 1" you should provide the following URL:
+        'GET http://localhost:1026/ngsi-ld/v1/entities/Building/name/Building%201' or 'GET /ngsi-ld/v1/entities/Building/name/Building%201'
+        """
+        base_url = "http://localhost:1026"
+
+        # Normalize params without printing anything to stdout
+        if isinstance(params, str) and params.strip().startswith("GET"):
+            params = params.strip()[3:]
+        if isinstance(params, str) and params.strip().startswith("http://localhost:1026/"):
+            params = params.strip()[len("http://localhost:1026/"):]
+        params = params.lstrip("/").replace(" ", "")
+
+        full_url = f"{base_url}/{params}"
+
+        headers = {
+            "Accept": "application/ld+json, application/json;q=0.9, */*;q=0.1",
+            "Link": '<http://context/user-context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"',
+        }
+
+        try:
+            logger.info("Requesting: %s", full_url)
+            resp = requests.get(full_url, headers=headers)
+
+            # Try JSON; fall back to text
+            try:
+                body = resp.json()
+            except ValueError:
+                body = {"raw_response": resp.text}
+
+            # Return ONLY JSON to stdout
+            result = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body": body,
+            }
+
+            # Raise for non-2xx after capturing body, but still return JSON error
+            resp.raise_for_status()
+            return json.dumps(result)
+
+        except requests.exceptions.RequestException as e:
+            # Still return valid JSON
+            return json.dumps({"error": str(e), "url": full_url})
+
 
 
 # This tool creates or updates entities in the Context Broker
