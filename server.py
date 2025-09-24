@@ -128,6 +128,12 @@ def execute_query(params: str) -> str:
             params = params.strip()[len("http://localhost:1026/"):]
         params = params.lstrip("/").replace(" ", "")
 
+        # Check if params start with "/" (possibly with leading spaces), and strip spaces and the first slash
+        if isinstance(params, str):
+            params = params.lstrip()
+            if params.startswith("/"):
+                params = params[1:]
+
         full_url = f"{base_url}/{params}"
 
         headers = {
