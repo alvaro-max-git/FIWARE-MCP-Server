@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 import time
 import signal
 import sys
@@ -26,8 +26,6 @@ signal.signal(signal.SIGINT, signal_handler)
 # This MCP server provides tools for interacting with a FIWARE Context Broker
 mcp = FastMCP(
     name="CB-assistant",
-    host="127.0.0.1",
-    port=5001
 )
 
 # This tool gets the Context Broker version
@@ -209,10 +207,16 @@ def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=No
 
 if __name__ == "__main__":
     try:
-        print("Starting MCP server 'CB-assistant' on 127.0.0.1:5001")
-        # Use this approach to keep the server running
-        mcp.run()
+        print("Starting MCP server 'CB-assistant' on 0.0.0.0:5001")
+        print(f"Full URL: http://127.0.0.1:5001/sse")
+      
+        mcp.run(
+            transport="sse",
+            host="127.0.0.1",
+            port=5001,
+        )
+
     except Exception as e:
         print(f"Error: {e}")
         # Sleep before exiting to give time for error logs
-        time.sleep(3)
+        time.sleep(3) 
