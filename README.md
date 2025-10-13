@@ -39,27 +39,79 @@ pip install -r requirements.txt
 
 ## Claude Desktop integration
 
-```bash
-mcp install server.py
+Claude Desktop should launch the server via STDIO. Do not use “mcp install” or “mcp run” with this server.
 
-# Custom name
-mcp install server.py --name "FIWARE MCP Server"
+Example configuration (adjust paths for your environment):
+```json
+{
+  "mcpServers": {
+    "CB-assistant": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "requests>=2.31.0",
+        "--with",
+        "fastmcp>=0.3.0",
+        "python",
+        "PATH\\TO\\FIWARE-MCP-Server\\server.py"
+      ]
+    }
+  }
+}
+```
 
-# Environment variables, if any
-mcp install server.py -v API_KEY=abc123 -v DB_URL=postgres://...
-mcp install server.py -f .env
+Alternative if dependencies are installed with pip:
+```json
+{
+  "mcpServers": {
+    "CB-assistant": {
+      "command": "python",
+      "args": [
+        "PATH\\TO\\FIWARE-MCP-Server\\server.py"
+      ]
+    }
+  }
+}
 ```
 
 ## Usage
 
-Start the MCP server:
+By default, running the script starts the server in STDIO mode. Use `--http` to start an HTTP server.
+
+- STDIO (default):
 ```bash
 python server.py
-# or
-mcp run server.py
 ```
 
-The server will start on `127.0.0.1:5001` by default.
+- HTTP mode:
+```bash
+python server.py --http
+```
+
+- HTTP host/port (optional):
+```bash
+python server.py --http --host 127.0.0.1 --port 5001
+```
+
+When running with `--http`, the server binds to the provided host/port and uses stateless HTTP sessions for compatibility with streamable HTTP clients.
+
+### Redirecting with ngrok (HTTP mode)
+
+To use LLMs via external APIs (for example the OpenAI Responses API) you may need to expose your local MCP server to the Internet. Use ngrok to create a public HTTPS tunnel to the server when running in HTTP mode.
+
+1. Sign up at https://ngrok.com and install the ngrok client for your OS.
+2. Add your ngrok auth token to the client (follow ngrok's OS-specific setup). For example:
+   - ngrok (v3) config command: ngrok config add-authtoken <YOUR_AUTH_TOKEN>
+3. Start your MCP server in HTTP mode (if not already running). Example:
+   - python server.py --http --host 127.0.0.1 --port 5001
+4. Start an ngrok tunnel that forwards to your HTTP server:
+   - ngrok http http://127.0.0.1:5001
+   (replace host/port if you configured them differently)
+5. Once ngrok is running it will display one or more public forwarding URLs. The MCP endpoint will be reachable at:
+   - {PUBLIC_URL}/mcp
+
+Note: Keep your auth token secure. The public URL stays active while ngrok is running and will cease to be reachable when you stop the tunnel.
 
 ### Available Tools
 
@@ -105,8 +157,8 @@ result = publish_to_CB(entity_data=entity_data)
 ## Configuration
 
 The server can be configured by modifying the following parameters in `server.py`:
-- Host address
-- Port number
+- Host address (HTTP mode only)
+- Port number (HTTP mode only)
 - Timeout settings
 
 ## Error Handling
@@ -123,4 +175,4 @@ Feel free to submit issues and enhancement requests!
 
 ## License
 
-This project is licensed under the Apache License 2.0. 
+This project is licensed under the Apache License 2.0.

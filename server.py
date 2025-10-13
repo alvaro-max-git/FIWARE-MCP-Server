@@ -5,6 +5,7 @@ import sys
 import requests
 import json
 import logging
+import argparse
 
 # --- Logging to STDERR only ---
 logger = logging.getLogger("cb-assistant")
@@ -16,9 +17,19 @@ logger.addHandler(_stderr_handler)
 logger.propagate = False
 
 
+# Parse CLI args early so we can configure MCP instance accordingly
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--http", action="store_true", help="Run MCP server over HTTP transport")
+_parser.add_argument("--host", default="127.0.0.1", help="HTTP host (only for --http)")
+_parser.add_argument("--port", type=int, default=5001, help="HTTP port (only for --http)")
+_args, _ = _parser.parse_known_args()
+_IS_HTTP = _args.http
+_HOST = _args.host
+_PORT = _args.port
+
 # Handle SIGINT (Ctrl+C) gracefully
 def signal_handler(sig, frame):
-    print("Shutting down server gracefully...")
+    logger.info("Shutting down server gracefully...")  # was print
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -26,7 +37,7 @@ signal.signal(signal.SIGINT, signal_handler)
 # This MCP server provides tools for interacting with a FIWARE Context Broker
 mcp = FastMCP(
     name="CB-assistant",
-    stateless_http=True, #fixing closed sessions when using streamable-http
+    stateless_http=_IS_HTTP,  # only enable when running in HTTP mode
 )
 
 # This tool gets the Context Broker version
@@ -169,9 +180,9 @@ def execute_query(params: str) -> str:
 
 # This tool creates or updates entities in the Context Broker
 @mcp.tool()
-def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=None) -> str:
+def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=None) -> str:  # type: ignore
     """Publish an entity to the CB."""
-    broker_url = f"http://{address}:{port}/ngsi-ld/v1/entities"  # Default URL, adjust if needed
+    broker_url = f"http://{address}:{port}/ngsi-ld/v1/entities"
     headers = {
         "Content-Type": "application/ld+json"
     }
@@ -179,9 +190,9 @@ def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=No
         response = requests.post(broker_url, json=entity_data, headers=headers)
 
         if response.status_code == 201:
-            print(f"Success! Entity created. Status code: {response.status_code}")
+            logger.info("Success! Entity created. Status code: %s", response.status_code)
         elif response.status_code == 409:
-            print(f"Entity already exists. Status code: {response.status_code}")
+            logger.info("Entity already exists. Status code: %s", response.status_code)
 
             # Update the entity if it already exists
             entity_id = entity_data["id"]
@@ -194,29 +205,32 @@ def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=No
             update_data.pop("@context", None)
 
             update_response = requests.patch(update_url, json=update_data, headers=headers)
-            print(f"Update attempt result: {update_response.status_code}")
+            logger.info("Update attempt result: %s", update_response.status_code)
         else:
-            print(f"Error creating entity. Status code: {response.status_code}")
-            print(f"Response content: {response.text}")
+            logger.error("Error creating entity. Status code: %s", response.status_code)
+            logger.error("Response content: %s", response.text)
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.exception("An error occurred: %s", e)
 
-    print("\nEntity data sent:")
-    print(json.dumps(entity_data, indent=2))
+    logger.info("Entity data sent: %s", json.dumps(entity_data, indent=2))
     return json.dumps({"status": "completed"})
 
 
 if __name__ == "__main__":
     try:
-        print("Starting MCP server 'CB-assistant' on 0.0.0.0:5001")
-        print(f"Full URL: http://0.0.0.0:5001") 
-      
-        mcp.run(
-            transport="http",
-            host="0.0.0.0",       
-            port=5001,
-        )
+        if _IS_HTTP:
+            logger.info("Starting MCP server 'CB-assistant' on %s:%s (HTTP)", _HOST, _PORT)
+            mcp.run(
+                transport="http",
+                host=_HOST,
+                port=_PORT,
+            )
+        else:
+            logger.info("Starting MCP server 'CB-assistant' (STDIO)")
+            mcp.run(
+                transport="stdio",
+            )
 
     except Exception as e:
-        print(f"Error: {e}")
+        logger.exception("Error: %s", e)
         time.sleep(3)
