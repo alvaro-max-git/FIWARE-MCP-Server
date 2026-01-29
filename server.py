@@ -6,6 +6,7 @@ import requests
 import json
 import logging
 import argparse
+from haversine import haversine, Unit
 
 # --- Logging to STDERR only ---
 logger = logging.getLogger("cb-assistant")
@@ -214,6 +215,31 @@ def publish_to_CB(address: str="localhost", port: int=1026, entity_data: dict=No
 
     logger.info("Entity data sent: %s", json.dumps(entity_data, indent=2))
     return json.dumps({"status": "completed"})
+
+# This tool calculates the Haversine distance between two coordinates.
+@mcp.tool()
+def haversine_dist(lat1: float, lon1: float, lat2: float, lon2: float, unit: str = "km") -> float:
+    """
+    Calculate the Haversine distance between two geographic points.
+
+    Args:
+        lat1: Latitude of the first point.
+        lon1: Longitude of the first point.
+        lat2: Latitude of the second point.
+        lon2: Longitude of the second point.
+        unit: Unit of measurement. Options: 'km' (default), 'm', 'mi', 'nmi', 'ft', 'in'.
+    """
+    unit_mapping = {
+        "km": Unit.KILOMETERS,
+        "m": Unit.METERS,
+        "mi": Unit.MILES,
+        "nmi": Unit.NAUTICAL_MILES,
+        "ft": Unit.FEET,
+        "in": Unit.INCHES
+    }
+    
+    selected_unit = unit_mapping.get(unit.lower(), Unit.KILOMETERS)
+    return haversine((lat1, lon1), (lat2, lon2), unit=selected_unit)
 
 
 if __name__ == "__main__":

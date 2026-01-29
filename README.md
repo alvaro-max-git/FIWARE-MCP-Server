@@ -136,6 +136,14 @@ Note: Keep your auth token secure. The public URL stays active while ngrok is ru
      - entity_data (required: dictionary with entity information)
    - Returns: JSON string with operation status
 
+4. **haversine_dist**
+   - Calculates the Haversine distance between two geographic points
+   - Parameters:
+     - lat1, lon1 (Point A coordinates)
+     - lat2, lon2 (Point B coordinates)
+     - unit (default: "km", options: "m", "mi", "nmi", "ft", "in")
+   - Returns: Float (distance)
+
 ### Example Usage
 
 ```python
